@@ -20,10 +20,10 @@ jobs:
       LC_ALL: "en_US.UTF-8"
     steps:
       - name: Check out repo
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v7
         with:
           python-version: "3.11"
 
@@ -60,7 +60,7 @@ jobs:
       # GitHub's own documented direct-CLI usage instead.
       # See: https://docs.github.com/copilot/how-tos/copilot-cli/use-copilot-cli-in-actions
       - name: Set up Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v7
 
       - name: Install Copilot CLI
         run: npm install -g @github/copilot
