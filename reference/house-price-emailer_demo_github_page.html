@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>Nhà & căn hộ Hà Nội</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css">
+<style>
+  :root {
+    --bg:#f7f7f8; --surface:#ffffff; --border:#e4e4e7; --text:#18181b;
+    --muted:#71717a; --faint:#a1a1aa; --accent:#a21caf; --accent-soft:#fae8ff;
+    --accent-text:#86198f; --positive:#16a34a; --positive-soft:#ecfdf5; --warn-soft:#fffbeb; --warn-text:#92400e;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#0b0b0d; --surface:#17171a; --border:#2a2a2e; --text:#f4f4f5; --muted:#a1a1aa; --faint:#71717a; }
+  }
+  #map { height:420px; border-radius:12px; border:1px solid var(--border); z-index:0; }
+  .price-pin { background:transparent; border:none; }
+  .price-pin-label {
+    position:absolute; transform:translate(-50%, -100%);
+    background:var(--accent); color:#fff; font-weight:700; font-size:12px;
+    padding:4px 8px; border-radius:6px; white-space:nowrap;
+    box-shadow:0 2px 6px rgba(0,0,0,.25);
+    font-family:ui-monospace,'SF Mono','Cascadia Code','Roboto Mono',Menlo,monospace;
+  }
+  .price-pin-arrow {
+    position:absolute; transform:translate(-50%, -2px);
+    width:0; height:0; border-left:5px solid transparent; border-right:5px solid transparent;
+    border-top:6px solid var(--accent);
+  }
+  * { box-sizing:border-box; }
+  body {
+    margin:0; background:var(--bg); color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;
+  }
+  .wrap { max-width:1100px; margin:0 auto; padding:32px 20px 60px; }
+  h1 { font-size:24px; font-weight:800; letter-spacing:-0.3px; margin:0; }
+  .subtitle { color:var(--muted); font-size:13px; margin:6px 0 24px; }
+  .kpi-strip { display:grid; grid-template-columns:repeat(auto-fit, minmax(150px, 1fr)); gap:12px; margin-bottom:32px; }
+  .kpi { background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:14px 16px; }
+  .kpi-value {
+    font-size:19px; font-weight:800; font-family:ui-monospace,'SF Mono','Cascadia Code','Roboto Mono',Menlo,monospace;
+    font-variant-numeric:tabular-nums; color:var(--accent-text);
+  }
+  .kpi-label { font-size:11.5px; color:var(--muted); margin-top:2px; }
+  h2 { font-size:15px; margin:0 0 14px; display:flex; align-items:center; gap:10px; }
+  .pill { background:var(--accent-soft); color:var(--accent-text); font-weight:700; padding:5px 12px; border-radius:999px; }
+  .muted { color:var(--muted); font-weight:400; font-size:12px; }
+  section { margin-bottom:36px; }
+  .grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(260px, 1fr)); gap:16px; }
+  .card {
+    display:block; background:var(--surface); border:1px solid var(--border); border-radius:12px;
+    overflow:hidden; transition:transform .15s ease, box-shadow .15s ease;
+  }
+  .card:hover { transform:translateY(-2px); box-shadow:0 8px 24px rgba(0,0,0,.08); }
+  .card-body-link { display:block; text-decoration:none; color:inherit; }
+  .gallery { display:flex; overflow-x:auto; scroll-snap-type:x mandatory; background:var(--border); }
+  .gallery a { flex:0 0 100%; display:block; scroll-snap-align:start; }
+  .gallery img { height:180px; width:100%; object-fit:cover; display:block; }
+  .gallery-empty { height:120px; }
+  .card-body { padding:14px 16px 16px; }
+  .card-title { font-weight:700; font-size:14px; line-height:1.4; margin-bottom:6px; }
+  .map-number-badge {
+    display:inline-block; background:var(--accent); color:#fff; font-size:11px; font-weight:800;
+    padding:1px 6px; border-radius:5px; vertical-align:middle;
+    font-family:ui-monospace,'SF Mono','Cascadia Code','Roboto Mono',Menlo,monospace;
+  }
+  .card-meta { color:var(--muted); font-size:12.5px; line-height:1.6; }
+  .card-meta.faint { color:var(--faint); font-size:11.5px; }
+  .warn { background:var(--warn-soft); color:var(--warn-text); font-size:11.5px; font-weight:600; padding:6px 10px; border-radius:6px; margin-top:8px; }
+  .price {
+    margin-top:10px; display:inline-block; background:var(--positive-soft); color:var(--positive);
+    font-weight:800; font-size:15px; padding:6px 12px; border-radius:999px;
+    font-family:ui-monospace,'SF Mono','Cascadia Code','Roboto Mono',Menlo,monospace; font-variant-numeric:tabular-nums;
+  }
+  footer { color:var(--faint); font-size:11.5px; margin-top:40px; line-height:1.7; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Nhà & căn hộ Hà Nội</h1>
+  <div class="subtitle">Cập nhật 15:42 21/08/2026 · 6 tin đăng</div>
+  <div class="kpi-strip"><div class="kpi"><div class="kpi-value">6</div><div class="kpi-label">Tổng số tin</div></div><div class="kpi"><div class="kpi-value">1 tỷ 990 triệu</div><div class="kpi-label">Căn hộ / Chung cư rẻ nhất</div></div><div class="kpi"><div class="kpi-value">300 triệu</div><div class="kpi-label">Nhà rẻ nhất</div></div><div class="kpi"><div class="kpi-value">6/6</div><div class="kpi-label">Có vị trí trên bản đồ</div></div></div>
+  
+<section>
+  <h2><span class="pill" style="background:#dbeafe;color:#1e40af;">Bản đồ</span> <span class="muted">6/6 tin có vị trí - số trên bản đồ khớp với số trên mỗi tin bên dưới</span></h2>
+  <div id="map"></div>
+</section>
+<script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.min.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  if (typeof L === 'undefined') {
+    console.error('Leaflet failed to load - map skipped, rest of page still works.');
+    var mapEl = document.getElementById('map');
+    if (mapEl) mapEl.outerHTML = '<p class="muted">Không tải được bản đồ (lỗi mạng) - xem danh sách bên dưới.</p>';
+    return;
+  }
+  const markers = [{"lat": 21.0367, "lon": 105.7622, "number": 1, "title": "Căn hộ tầm tiền cực hiếm ở Hồ Tùng Mậu Cầu Giấy", "price": "1 tỷ 990 triệu", "url": "https://mogi.vn/quan-cau-giay/mua-can-ho-chung-cu/id1", "category": "Căn hộ / Chung cư"}, {"lat": 21.0281, "lon": 106.0104, "number": 2, "title": "Chính thức mở bán căn hộ Alluvia City toà Alumi 3 chiết khấu tới 11,5%", "price": "2 tỷ 350 triệu", "url": "https://mogi.vn/huyen-gia-lam/mua-can-ho-chung-cu/id2", "category": "Căn hộ / Chung cư"}, {"lat": 21.0037847, "lon": 105.7886783, "number": 3, "title": "Bán căn hộ chung cư The Matrix One GĐ1-2 90m2 chỉ 1 tỷ 2pn 2vs", "price": "10 tỷ", "url": "https://mogi.vn/quan-nam-tu-liem/mua-can-ho-chung-cu/id3", "category": "Căn hộ / Chung cư"}, {"lat": 21.063, "lon": 105.7772, "number": 4, "title": "Bán nhà đẹp Xuân Đỉnh - 6 tầng thang máy, ô tô đỗ cửa", "price": "4 tỷ 800 triệu", "url": "https://mogi.vn/quan-bac-tu-liem/mua-nha/id4", "category": "Nhà"}, {"lat": 21.0635, "lon": 105.7775, "number": 5, "title": "Bán gấp nhà đẹp Xuân Đỉnh - Ô TÔ ngủ trong nhà", "price": "300 triệu", "url": "https://mogi.vn/quan-bac-tu-liem/mua-nha/id5", "category": "Nhà"}, {"lat": 21.058, "lon": 105.783, "number": 6, "title": "Bán nhà giá tương tự listing #4", "price": "4 tỷ 800 triệu", "url": "https://mogi.vn/quan-bac-tu-liem/mua-nha/id6", "category": "Nhà"}];
+  const map = L.map('map');
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+    maxZoom: 19,
+  }).addTo(map);
+  const bounds = [];
+  markers.forEach(m => {
+    const label = L.divIcon({
+      className: 'price-pin',
+      html: '<div class="price-pin-label">#' + m.number + ' · ' + m.price.replace(/</g, '&lt;') + '</div><div class="price-pin-arrow"></div>',
+      iconSize: null,
+      iconAnchor: [0, 0],
+    });
+    const marker = L.marker([m.lat, m.lon], {icon: label}).addTo(map);
+    marker.bindPopup(
+      '<strong>#' + m.number + ' - ' + m.title.replace(/</g, '&lt;') + '</strong><br>' +
+      m.price + '<br><a href="' + m.url + '" target="_blank" rel="noopener">Xem tin</a>'
+    );
+    bounds.push([m.lat, m.lon]);
+  });
+  if (bounds.length > 0) map.fitBounds(bounds, {padding: [30, 30]});
+});
+</script>
+<section>
+  <h2><span class="pill">Căn hộ / Chung cư</span> <span class="muted">3 tin · giá tăng dần</span></h2>
+  <div class="grid">
+<div class="card">
+  <div class="gallery"><a href="https://mogi.vn/quan-cau-giay/mua-can-ho-chung-cu/id1" target="_blank" rel="noopener"><img src="https://cloud.mogi.vn/demo/photo1.jpg" alt="" loading="lazy"></a><a href="https://mogi.vn/quan-cau-giay/mua-can-ho-chung-cu/id1" target="_blank" rel="noopener"><img src="https://cloud.mogi.vn/demo/photo2.jpg" alt="" loading="lazy"></a></div>
+  <a class="card-body-link" href="https://mogi.vn/quan-cau-giay/mua-can-ho-chung-cu/id1" target="_blank" rel="noopener">
+    <div class="card-body">
+      <div class="card-title"><span class="map-number-badge">#1</span> Căn hộ tầm tiền cực hiếm ở Hồ Tùng Mậu Cầu Giấy</div>
+      <div class="card-meta">Quận Cầu Giấy · 35 m² · 2 PN · 1 WC</div>
+      <div class="card-meta faint">đăng 23/05/2026</div>
+      
+      <div class="price">1 tỷ 990 triệu</div>
+    </div>
+  </a>
+</div>
+
+<div class="card">
+  <div class="gallery"><a href="https://mogi.vn/huyen-gia-lam/mua-can-ho-chung-cu/id2" target="_blank" rel="noopener"><img src="https://cloud.mogi.vn/demo/photo3.jpg" alt="" loading="lazy"></a></div>
+  <a class="card-body-link" href="https://mogi.vn/huyen-gia-lam/mua-can-ho-chung-cu/id2" target="_blank" rel="noopener">
+    <div class="card-body">
+      <div class="card-title"><span class="map-number-badge">#2</span> Chính thức mở bán căn hộ Alluvia City toà Alumi 3 chiết khấu tới 11,5%</div>
+      <div class="card-meta">Huyện Gia Lâm · 38 m² · 1 PN · 1 WC</div>
+      <div class="card-meta faint">đăng 01/03/2026</div>
+      
+      <div class="price">2 tỷ 350 triệu</div>
+    </div>
+  </a>
+</div>
+
+<div class="card">
+  <div class="gallery"><a href="https://mogi.vn/quan-nam-tu-liem/mua-can-ho-chung-cu/id3" target="_blank" rel="noopener"><img src="https://cloud.mogi.vn/demo/photo4.jpg" alt="" loading="lazy"></a></div>
+  <a class="card-body-link" href="https://mogi.vn/quan-nam-tu-liem/mua-can-ho-chung-cu/id3" target="_blank" rel="noopener">
+    <div class="card-body">
+      <div class="card-title"><span class="map-number-badge">#3</span> Bán căn hộ chung cư The Matrix One GĐ1-2 90m2 chỉ 1 tỷ 2pn 2vs</div>
+      <div class="card-meta">Quận Nam Từ Liêm · 90 m² · 2 PN · 2 WC</div>
+      <div class="card-meta faint">đăng Hôm nay</div>
+      <div class="warn">⚠️ Cần kiểm tra: giá trong tiêu đề (1 tỷ) khác giá hiển thị</div>
+      <div class="price">10 tỷ</div>
+    </div>
+  </a>
+</div></div>
+</section>
+
+<section>
+  <h2><span class="pill">Nhà</span> <span class="muted">3 tin · giá tăng dần</span></h2>
+  <div class="grid">
+<div class="card">
+  <div class="gallery"><a href="https://mogi.vn/quan-bac-tu-liem/mua-nha/id4" target="_blank" rel="noopener"><img src="https://cloud.mogi.vn/demo/photo5.jpg" alt="" loading="lazy"></a><a href="https://mogi.vn/quan-bac-tu-liem/mua-nha/id4" target="_blank" rel="noopener"><img src="https://cloud.mogi.vn/demo/photo6.jpg" alt="" loading="lazy"></a><a href="https://mogi.vn/quan-bac-tu-liem/mua-nha/id4" target="_blank" rel="noopener"><img src="https://cloud.mogi.vn/demo/photo7.jpg" alt="" loading="lazy"></a></div>
+  <a class="card-body-link" href="https://mogi.vn/quan-bac-tu-liem/mua-nha/id4" target="_blank" rel="noopener">
+    <div class="card-body">
+      <div class="card-title"><span class="map-number-badge">#4</span> Bán nhà đẹp Xuân Đỉnh - 6 tầng thang máy, ô tô đỗ cửa</div>
+      <div class="card-meta">Quận Bắc Từ Liêm · 65 m² · 6 PN · 7 WC</div>
+      <div class="card-meta faint">đăng 08/05/2026</div>
+      
+      <div class="price">4 tỷ 800 triệu</div>
+    </div>
+  </a>
+</div>
+
+<div class="card">
+  <div class="gallery gallery-empty"></div>
+  <a class="card-body-link" href="https://mogi.vn/quan-bac-tu-liem/mua-nha/id5" target="_blank" rel="noopener">
+    <div class="card-body">
+      <div class="card-title"><span class="map-number-badge">#5</span> Bán gấp nhà đẹp Xuân Đỉnh - Ô TÔ ngủ trong nhà</div>
+      <div class="card-meta">Quận Bắc Từ Liêm · 65 m² · 6 PN · 7 WC</div>
+      <div class="card-meta faint">đăng 08/05/2026</div>
+      <div class="warn">⚠️ Cần kiểm tra: giá/m² bất thường (5 triệu/m²)</div>
+      <div class="price">300 triệu</div>
+    </div>
+  </a>
+</div>
+
+<div class="card">
+  <div class="gallery gallery-empty"></div>
+  <a class="card-body-link" href="https://mogi.vn/quan-bac-tu-liem/mua-nha/id6" target="_blank" rel="noopener">
+    <div class="card-body">
+      <div class="card-title"><span class="map-number-badge">#6</span> Bán nhà giá tương tự listing #4</div>
+      <div class="card-meta">Quận Bắc Từ Liêm · 58 m² · 4 PN · 3 WC</div>
+      <div class="card-meta faint">đăng Hôm qua</div>
+      
+      <div class="price">4 tỷ 800 triệu</div>
+    </div>
+  </a>
+</div></div>
+</section>
+  <footer>
+    Nguồn: từng tin đăng thực tế trên Mogi.vn (không phải giá trung bình) · Trang tự động, chỉ mang tính tham khảo, không phải lời khuyên đầu tư.
+  </footer>
+</div>
+</body>
+</html>
