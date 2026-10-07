@@ -79,7 +79,7 @@ import ssl
 import sys
 import time
 import unicodedata
-from datetime import datetime, timedelta, date
+from datetime import datetime, timedelta, date, timezone
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from html import escape
@@ -306,7 +306,7 @@ def save_last_hash(price_hash, sent_ids=None, path=STATE_FILE):
             "hash": price_hash,
             "date": _today_str(),
             "sent_ids": sorted(sent_ids) if sent_ids is not None else [],
-            "updated": datetime.utcnow().isoformat() + "Z",
+            "updated": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
         }, f)
 
 
@@ -858,9 +858,9 @@ def build_listing_card_html(l):
 GITHUB_PAGE_PATH = "docs/index.html"
 # Set this to your actual Pages URL once GitHub Pages is enabled for this
 # repo (Settings -> Pages -> Source: main branch, /docs folder) - same
-# setup as tuongphantrue/currency-rate-emailer. Standard project-page URL
+# setup as tuongphanbase-stack/currency-rate-emailer. Standard project-page URL
 # pattern: https://<username>.github.io/<repo>/
-GITHUB_PAGE_URL = os.environ.get("GITHUB_PAGE_URL", "https://tuongphantrue.github.io/house-price-emailer/")
+GITHUB_PAGE_URL = os.environ.get("GITHUB_PAGE_URL", "https://tuongphanbase-stack.github.io/house-price-emailer/")
 
 
 def build_listing_card_page_html(l):

@@ -12,6 +12,9 @@ jobs:
   send:
     runs-on: ubuntu-latest
     env:
+      # Without the Gmail secrets, the Send step is skipped (with a warning)
+      # instead of failing the run every time.
+      HAS_GMAIL: ${{ secrets.GMAIL_ADDRESS != '' && secrets.GMAIL_APP_PASSWORD != '' }}
       PYTHONUTF8: "1"
       LANG: "en_US.UTF-8"
       LC_ALL: "en_US.UTF-8"
@@ -85,7 +88,7 @@ jobs:
       # Publish docs/index.html to main so GitHub Pages serves the latest
       # listings (with reliably-working images, unlike inline email
       # images) - mirrors the same pattern already proven in
-      # tuongphantrue/currency-rate-emailer's workflow. Must run BEFORE
+      # tuongphanbase-stack/currency-rate-emailer's workflow. Must run BEFORE
       # sending, since the email links to this page and the link should
       # already be live. continue-on-error so a git hiccup here can't
       # block the email itself - worst case the page link is briefly
@@ -105,7 +108,12 @@ jobs:
             sleep 30
           fi
 
+      - name: Warn that the Gmail secrets are missing
+        if: env.HAS_GMAIL != 'true'
+        run: echo "::warning::GMAIL_ADDRESS / GMAIL_APP_PASSWORD secrets are not set, so no email was sent. Add them in Settings -> Secrets and variables -> Actions."
+
       - name: Send email
+        if: env.HAS_GMAIL == 'true'
         env:
           GMAIL_ADDRESS: ${{ secrets.GMAIL_ADDRESS }}
           GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
@@ -113,6 +121,8 @@ jobs:
         run: python hanoi_house_price_emailer.py send
 
       - name: Persist dedup state
+        # Only remember items as sent if the email actually went out.
+        if: env.HAS_GMAIL == 'true'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
