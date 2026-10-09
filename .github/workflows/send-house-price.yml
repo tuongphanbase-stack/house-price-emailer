@@ -2,7 +2,9 @@ name: Send Hanoi House Price
 
 on:
   schedule:
-    - cron: "*/30 * * * *"
+    # Every 3 hours (UTC). Listings change slowly and each run takes ~12
+    # minutes of scraping, so every 30 minutes mostly repeated the same data.
+    - cron: "7 */3 * * *"
   workflow_dispatch: {}
 
 permissions:
