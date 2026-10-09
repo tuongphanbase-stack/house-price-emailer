@@ -116,7 +116,7 @@ ALLOW_INSECURE_SSL_FALLBACK = os.environ.get("ALLOW_INSECURE_SSL_FALLBACK", "fal
 # directly inspectable from outside a live run.
 DEBUG_DUMP_CHUNKS = os.environ.get("DEBUG_DUMP_CHUNKS", "false").lower() == "true"
 
-MIN_PLAUSIBLE_PRICE_TRIEU = float(os.environ.get("MIN_PLAUSIBLE_PRICE_TRIEU", "300"))
+MIN_PLAUSIBLE_PRICE_TRIEU = float(os.environ.get("MIN_PLAUSIBLE_PRICE_TRIEU") or "300")
 # Price ceiling in triệu đồng (1 tỷ = 1000 triệu) - hardcoded to 5 tỷ VND.
 # Listings with no confirmed price (unparsed, or "Thỏa thuận"/negotiable)
 # are excluded too, since they can't be confirmed to meet the ceiling.
@@ -240,7 +240,7 @@ POSTED_EXPLICIT_DATE_RE = re.compile(r"\b(\d{1,2})/(\d{1,2})/(\d{4})\b")
 # Listings aren't shown if their post is older than this many days - an old
 # post's asking price may no longer reflect the current market (or the unit
 # may already be sold). Set to 0 to disable age filtering entirely.
-MAX_LISTING_AGE_DAYS = int(os.environ.get("MAX_LISTING_AGE_DAYS", "365"))
+MAX_LISTING_AGE_DAYS = int(os.environ.get("MAX_LISTING_AGE_DAYS") or "365")
 
 # Max chunk size (chars of raw HTML) to look at per listing, used as a
 # fallback when a listing has no "next listing ID" to bound it against
