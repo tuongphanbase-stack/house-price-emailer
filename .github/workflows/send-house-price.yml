@@ -91,7 +91,7 @@ jobs:
       # Publish docs/index.html to main so GitHub Pages serves the latest
       # listings (with reliably-working images, unlike inline email
       # images) - mirrors the same pattern already proven in
-      # tuongphanbase-stack/currency-rate-emailer's workflow. Must run BEFORE
+      # tuongphanbase/currency-rate-emailer's workflow. Must run BEFORE
       # sending, since the email links to this page and the link should
       # already be live. continue-on-error so a git hiccup here can't
       # block the email itself - worst case the page link is briefly

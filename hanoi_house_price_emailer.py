@@ -856,11 +856,16 @@ def build_listing_card_html(l):
 
 
 GITHUB_PAGE_PATH = "docs/index.html"
-# Set this to your actual Pages URL once GitHub Pages is enabled for this
-# repo (Settings -> Pages -> Source: main branch, /docs folder) - same
-# setup as tuongphanbase-stack/currency-rate-emailer. Standard project-page URL
-# pattern: https://<username>.github.io/<repo>/
-GITHUB_PAGE_URL = os.environ.get("GITHUB_PAGE_URL", "https://tuongphanbase-stack.github.io/house-price-emailer/")
+# The GitHub Pages URL of this repo (Settings -> Pages -> Source: main branch,
+# /docs folder): https://<username>.github.io/<repo>/. Inside Actions it is
+# built from GITHUB_REPOSITORY, so it follows a username change; set
+# GITHUB_PAGE_URL to override.
+def _default_page_url():
+    owner, _, name = (os.environ.get("GITHUB_REPOSITORY") or "tuongphanbase/house-price-emailer").partition("/")
+    return f"https://{owner.lower()}.github.io/{name}/"
+
+
+GITHUB_PAGE_URL = os.environ.get("GITHUB_PAGE_URL") or _default_page_url()
 
 
 def build_listing_card_page_html(l):
