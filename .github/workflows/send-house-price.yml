@@ -7,13 +7,142 @@ on:
     - cron: "7 */3 * * *"
   workflow_dispatch: {}
 
-permissions:
-  contents: write
+# Each job asks for what it needs. The AI review reads seller-written
+# listing text, so it runs in its own job with no token permissions, no
+# checkout and its shell/write/web tools denied - see the ai-review job.
+permissions: {}
 
 jobs:
-  send:
+  # Phase 1 (was "generate"): fetch listings, apply rule-based filters,
+  # write email/listings.json + email/ai_prompt.txt
+  prepare:
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    permissions:
+      contents: read
+    env:
+      PYTHONUTF8: "1"
+      LANG: "en_US.UTF-8"
+      LC_ALL: "en_US.UTF-8"
+    steps:
+      - name: Check out repo
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install --upgrade certifi
+          pip install -r requirements.txt
+
+      - name: Prepare listings
+        env:
+          SEND_ONLY_ON_CHANGE: "false"
+          TIMEZONE: "Asia/Ho_Chi_Minh"
+        run: python hanoi_house_price_emailer.py prepare
+
+      - name: Upload listings
+        uses: actions/upload-artifact@v7
+        with:
+          name: listings
+          path: email/listings.json
+          if-no-files-found: error
+          retention-days: 1
+          overwrite: true  # lets "Re-run jobs" upload again
+
+      - name: Upload AI prompt
+        uses: actions/upload-artifact@v7
+        with:
+          name: ai-prompt
+          path: email/ai_prompt.txt
+          if-no-files-found: error
+          retention-days: 1
+          overwrite: true  # lets "Re-run jobs" upload again
+
+  # Phase 2: AI review of listings.json via Copilot CLI, called
+  # directly (NOT via actions/ai-inference - that action proved
+  # unreliable: @v1 is stale/hardcodes the retired GitHub Models
+  # endpoint, and @main gave inconsistent results). This mirrors
+  # GitHub's own documented direct-CLI usage instead.
+  # See: https://docs.github.com/copilot/how-tos/copilot-cli/use-copilot-cli-in-actions
+  #
+  # The prompt includes text written by sellers, so treat it as hostile:
+  # this job gets no GITHUB_TOKEN permissions and no checkout (nothing to
+  # push, no git credentials on disk), and the CLI runs from an empty
+  # directory with shell, file-write and URL tools denied. It only has to
+  # answer with text; the build step validates that answer.
+  ai-review:
+    needs: prepare
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions: {}
+    steps:
+      - name: Download AI prompt
+        uses: actions/download-artifact@v7
+        with:
+          name: ai-prompt
+          path: ${{ runner.temp }}/ai-in
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+
+      # Pinned to an exact version so a new release can't change what runs
+      # here with the PAT in scope. Bump deliberately.
+      - name: Install Copilot CLI
+        run: npm install -g @github/copilot@1.0.88
+
+      - name: AI review listings
+        continue-on-error: true  # fails open - build step handles a missing/bad response gracefully
+        env:
+          COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_PAT }}
+          AI_IN: ${{ runner.temp }}/ai-in
+          AI_OUT: ${{ runner.temp }}/ai-out
+          AI_CWD: ${{ runner.temp }}/ai-cwd
+        # No --yolo / --allow-all-tools: in -p mode any tool request that
+        # isn't allowed is auto-denied, and the explicit --deny-tool rules
+        # win over any allow rule. Reads are limited to the (empty) working
+        # directory.
+        run: |
+          mkdir -p "$AI_OUT" "$AI_CWD"
+          cd "$AI_CWD"
+          copilot -p "$(cat "$AI_IN/ai_prompt.txt")" \
+            --silent --no-color --no-auto-update \
+            --deny-tool=shell --deny-tool=write --deny-tool=url \
+            --disallow-temp-dir --disable-builtin-mcps \
+            --no-custom-instructions --no-ask-user \
+            > "$AI_OUT/ai_response.json"
+          echo "--- raw Copilot CLI output (for debugging) ---"
+          # Model output is untrusted: don't let it issue ::workflow commands::
+          stop="$(cat /proc/sys/kernel/random/uuid)"
+          echo "::stop-commands::$stop"
+          cat "$AI_OUT/ai_response.json"
+          echo
+          echo "::$stop::"
+
+      - name: Upload AI response
+        uses: actions/upload-artifact@v7
+        with:
+          name: ai-response
+          path: ${{ runner.temp }}/ai-out/ai_response.json
+          if-no-files-found: ignore
+          retention-days: 1
+          overwrite: true  # lets "Re-run jobs" upload again
+
+  send:
+    needs: [prepare, ai-review]
+    # The AI review is optional: still build and send if it failed or was
+    # skipped, as long as prepare produced the listings.
+    if: ${{ !cancelled() && needs.prepare.result == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write
     env:
       # Without the Gmail secrets, the Send step is skipped (with a warning)
       # instead of failing the run every time.
@@ -48,36 +177,19 @@ jobs:
             echo "No previous state found - first run."
           fi
 
-      # Phase 1 (was "generate"): fetch listings, apply rule-based filters,
-      # write email/listings.json + email/ai_prompt.txt
-      - name: Prepare listings
-        env:
-          SEND_ONLY_ON_CHANGE: "false"
-          TIMEZONE: "Asia/Ho_Chi_Minh"
-        run: python hanoi_house_price_emailer.py prepare
+      - name: Download listings
+        uses: actions/download-artifact@v7
+        with:
+          name: listings
+          path: email
 
-      # Phase 2: AI review of listings.json via Copilot CLI, called
-      # directly (NOT via actions/ai-inference - that action proved
-      # unreliable: @v1 is stale/hardcodes the retired GitHub Models
-      # endpoint, and @main gave inconsistent results). This mirrors
-      # GitHub's own documented direct-CLI usage instead.
-      # See: https://docs.github.com/copilot/how-tos/copilot-cli/use-copilot-cli-in-actions
-      - name: Set up Node.js
-        uses: actions/setup-node@v7
-
-      - name: Install Copilot CLI
-        run: npm install -g @github/copilot
-
-      - name: AI review listings
-        id: ai_review
-        if: hashFiles('email/ai_prompt.txt') != ''
-        continue-on-error: true  # fails open - build step handles a missing/bad response gracefully
-        env:
-          COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_PAT }}
-        run: |
-          copilot --yolo --no-color -p "$(cat email/ai_prompt.txt)" > email/ai_response.json
-          echo "--- raw Copilot CLI output (for debugging) ---"
-          cat email/ai_response.json
+      # Absent when the AI review failed or was skipped.
+      - name: Download AI response
+        continue-on-error: true
+        uses: actions/download-artifact@v7
+        with:
+          name: ai-response
+          path: email
 
       # Phase 3 (new): apply the AI verdict (if ai_response.json exists -
       # if the AI step failed/was skipped, build falls back to the

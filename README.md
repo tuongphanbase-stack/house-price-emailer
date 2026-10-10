@@ -38,6 +38,10 @@ Runs automatically on a schedule via GitHub Actions.
    Personal Access Token with Copilot Requests permission, free tier is
    enough) — if it's missing or the step fails, the build falls back to
    the rule-based filters above rather than blocking the email.
+   Because the prompt includes text written by sellers, the AI runs in
+   its own workflow job with no repository permissions, no checkout and
+   its shell, file-write and web tools denied, and the build only
+   accepts `ok`/`reject` verdicts for listing ids it already has.
 
 4. **Self-check pass** (`flag_suspicious`): independent of the AI step,
    flags (doesn't remove) any listing with an implausible price-per-m²,
@@ -93,7 +97,9 @@ Runs automatically on a schedule via GitHub Actions.
    `/docs`.
 6. The workflow (`.github/workflows/send-house-price.yml`) runs
    `prepare` → AI review → `build` → publish page → `send` on its
-   schedule, or trigger it manually via `workflow_dispatch`.
+   schedule, or trigger it manually via `workflow_dispatch`. Those run as
+   three jobs (`prepare`, `ai-review`, `send`) that hand files to each
+   other as run artifacts; only `send` can push to the repo.
 
 Script commands, if running any phase manually:
 

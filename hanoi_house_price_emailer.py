@@ -1199,6 +1199,7 @@ def resolve_timestamp():
 LISTINGS_JSON_PATH = os.path.join(EMAIL_DIR, "listings.json")
 AI_PROMPT_PATH = os.path.join(EMAIL_DIR, "ai_prompt.txt")
 AI_RESPONSE_PATH = os.path.join(EMAIL_DIR, "ai_response.json")
+AI_VERDICTS = {"ok", "reject"}
 
 
 def build_ai_prompt(listings):
@@ -1298,19 +1299,44 @@ def apply_ai_verdicts(listings):
               file=sys.stderr)
         return listings
 
-    try:
-        verdict_by_id = {v["id"]: v for v in verdicts if isinstance(v, dict) and "id" in v}
-    except (TypeError, KeyError):
+    if not isinstance(verdicts, list):
         print(f"  WARNING: AI response parsed as JSON but wasn't the expected list-of-objects "
               f"shape - skipping AI review step for this run.", file=sys.stderr)
         return listings
+
+    # The prompt contains seller-written listing text, so the response can
+    # be steered by a prompt injection. Only trust the narrow shape we asked
+    # for: a known listing id (as a string) with verdict "ok" or "reject".
+    # Anything else (unknown ids, other verdicts, non-string fields, repeat
+    # entries for an id already decided) is ignored, so the worst a hostile
+    # response can do is keep or drop listings we already had.
+    known_ids = {l["id"] for l in listings}
+    verdict_by_id = {}
+    ignored = 0
+    for v in verdicts:
+        if not isinstance(v, dict):
+            ignored += 1
+            continue
+        lid, verdict = v.get("id"), v.get("verdict")
+        if (not isinstance(lid, str) or lid not in known_ids or lid in verdict_by_id
+                or not isinstance(verdict, str) or verdict.strip().lower() not in AI_VERDICTS):
+            ignored += 1
+            continue
+        reason = v.get("reason")
+        # Reasons are only ever printed to the log - keep them short and on
+        # one line so they can't fake a GitHub Actions "::command::" line.
+        reason = re.sub(r"[\x00-\x1f\x7f]+", " ", reason)[:80] if isinstance(reason, str) else ""
+        verdict_by_id[lid] = {"verdict": verdict.strip().lower(), "reason": reason}
+    if ignored:
+        print(f"  Note: ignored {ignored} malformed/unknown entr{'y' if ignored == 1 else 'ies'} "
+              f"in the AI response.", file=sys.stderr)
 
     rejected = []
     kept = []
     for l in listings:
         v = verdict_by_id.get(l["id"])
-        if v and v.get("verdict") == "reject":
-            rejected.append((l, v.get("reason", "")))
+        if v and v["verdict"] == "reject":
+            rejected.append((l, v["reason"]))
         else:
             kept.append(l)
 
